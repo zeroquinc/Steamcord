@@ -30,5 +30,21 @@ def check_achievement_completion(user_ids, game_id):
         print(f"Completed Achievements: {completed_achievements}")
         print()
 
+def check_owned_games(user_ids):
+    # Create a SteamClient instance
+    client = SteamClient()
+
+    for user_id in user_ids:
+        # Create a Users instance and fetch owned games
+        user = client.user(user_id)
+        user.get_user_summaries()
+        user.get_owned_games()
+
+        print(f"Owned Games for {user.summary.personaname}")
+        for game in user.owned_games:
+            print(f"Game ID: {game.appid}")
+            print(f"Last Played: {game.last_played}")
+
 # Usage:
 check_achievement_completion(['76561198035515815', '76561198840513734'], '504230')
+check_owned_games(['76561198035515815', '76561198840513734'])
