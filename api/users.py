@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from utils.datetime import DateUtils
 
 class Users:
@@ -11,6 +9,7 @@ class Users:
         self.steam_id = steam_id
         self.summary = None
         self.achievements = []
+        self.owned_games = []
 
     def get_user_summaries(self):
         """Fetch user summaries"""
@@ -20,11 +19,13 @@ class Users:
         self.summary = UserSummary(response['response']['players'][0])
         return response
 
-    def get_recently_played_games(self):
-        """Fetch recently played games"""
-        endpoint = "IPlayerService/GetRecentlyPlayedGames/v0001"
+    def get_owned_games(self):
+        """Fetch owned games games"""
+        endpoint = "IPlayerService/GetOwnedGames/v0001"
         params = {"steamid": self.steam_id}
-        return self.client._get(endpoint, params)
+        response = self.client._get(endpoint, params)
+        self.owned_games = [UserOwnedGame(game) for game in response['response']['games']]
+        return response
     
     def get_user_achievements(self, app_id: str, l: str = "en"):
         """Fetch user achievements"""
@@ -50,3 +51,11 @@ class UserSummary:
         self.lastonline = DateUtils.format_timestamp(data['lastlogoff'])
         self.timecreated = DateUtils.format_timestamp(data['timecreated'])
         self.age = DateUtils.calculate_age(data['timecreated'])
+
+class UserOwnedGame:
+    def __init__(self, data):
+        self.appid = data['appid']
+        try:
+            self.last_played = DateUtils.format_timestamp(data['rtime_last_played'])
+        except KeyError:
+            self.last_played = "Unknown"
