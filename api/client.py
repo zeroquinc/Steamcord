@@ -1,9 +1,8 @@
 import requests
-from config.globals import STEAM_API_KEY
 
 class SteamClient:
-    def __init__(self):
-        self.api_key = STEAM_API_KEY
+    def __init__(self, api_key):
+        self.api_key = api_key
         self.session = requests.Session()
 
     def _get(self, endpoint, params=None):

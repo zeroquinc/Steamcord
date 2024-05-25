@@ -22,7 +22,7 @@ class Users:
     def get_owned_games(self):
         """Fetch owned games games"""
         endpoint = "IPlayerService/GetOwnedGames/v0001"
-        params = {"steamid": self.steam_id}
+        params = {"steamid": self.steam_id, "include_appinfo": 1}  # Include game name and logo information
         response = self.client._get(endpoint, params)
         self.owned_games = [UserOwnedGame(game) for game in response['response']['games']]
         return response
@@ -53,9 +53,10 @@ class UserSummary:
         self.age = DateUtils.calculate_age(data['timecreated'])
 
 class UserOwnedGame:
-    def __init__(self, data):
-        self.appid = data['appid']
+    def __init__(self, game_dict):
+        self.appid = game_dict['appid']
+        self.name = game_dict.get('name', '') 
         try:
-            self.last_played = DateUtils.format_timestamp(data['rtime_last_played'])
+            self.last_played = DateUtils.format_timestamp(game_dict['rtime_last_played'])
         except KeyError:
             self.last_played = "Unknown"
