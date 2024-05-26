@@ -163,4 +163,4 @@ cython_debug/
 *.class
 
 # Steam achievement files
-steam/data/*.json
+src/steam/data/*.json
