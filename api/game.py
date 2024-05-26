@@ -12,7 +12,10 @@ class Game:
         response = self.client._get(endpoint, params)
         self.gamename = response['game']['gameName']
         self.gameversion = response['game']['gameVersion']
-        self.achievements = [GameAchievement(a) for a in response['game']['availableGameStats']['achievements']]
+        if 'achievements' in response['game']['availableGameStats']:
+            self.achievements = [GameAchievement(a) for a in response['game']['availableGameStats']['achievements']]
+        else:
+            self.achievements = []
         return response
 
 class GameAchievement:
