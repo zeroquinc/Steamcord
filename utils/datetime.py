@@ -16,4 +16,4 @@ class DateUtils:
     """Format a timestamp to a human-readable format"""
     @staticmethod
     def format_timestamp(timestamp):
-        return datetime.fromtimestamp(timestamp).strftime('%d/%m/%y %H:%M')
+        return datetime.fromtimestamp(timestamp).strftime('%d/%m/%y %H:%M:%S')

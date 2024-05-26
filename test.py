@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
-from dateutil.parser import parse
 
 from api.client import SteamClient
+from utils.embed import EmbedBuilder
 from config.globals import STEAM_API_KEY1, STEAM_API_KEY2
 
 def check_achievement_completion(user_id, game_id, api_key):
@@ -47,33 +47,49 @@ def check_recently_played_games(user_id, api_key):
     # Create a User instance and fetch user's owned games
     user = client.user(user_id)
     user.get_user_summaries()
+    user.get_owned_games()
 
-    owned_games = user.get_owned_games()
-
-    # Get the current timestamp
-    current_timestamp = datetime.now().timestamp()
+    # Get the current timestamp and format it to match unlocktime
+    current_time = datetime.now().strftime('%d/%m/%y %H:%M:%S')
 
     print(f"Recently Played Games for User: {user.summary.personaname}")
-    for game in owned_games['response']['games']:
+    for user_game in user.owned_games:
         # Check if the game has been played within the last 24 hours
-        if game['rtime_last_played'] != 0 and current_timestamp - game['rtime_last_played'] <= 24 * 60 * 60:
-            # Create a Game instance and fetch game achievements
-            game_instance = client.game()
-            game_instance.get_game_achievements(game['appid'])
+        if user_game.last_played != "Unknown":
+            last_played_date = datetime.strptime(user_game.last_played, '%d/%m/%y %H:%M:%S')
+            if datetime.strptime(current_time, '%d/%m/%y %H:%M:%S') - last_played_date <= timedelta(days=20):
+                # Create a Game instance and fetch game achievements
+                game_instance = client.game()
+                game_instance.get_game_achievements(user_game.appid)
 
-            # Count the total number of achievements for the game
-            total_achievements = len(game_instance.achievements)
+                # Fetch the user's achievements for the game
+                user.get_user_achievements(user_game.appid, game_instance=game_instance)
 
-            # Fetch the user's achievements for the game
-            user.get_user_achievements(game['appid'])
+                print(f"Game Name: {user_game.name}")
+                print("Achievements unlocked in the last 10 days:")
+                print()
 
-            # Count the number of achievements the user has completed
-            completed_achievements = sum(1 for a in user.achievements if a.achieved == 1)
+                # Store achievements in a list
+                achievements = []
 
-            print(f"Game Name: {game['name']}")
-            print(f"Total Achievements: {total_achievements}")
-            print(f"Completed Achievements: {completed_achievements}")
-            print()
+                # Iterate over the user's achievements
+                for a in user.achievements:
+                    # Check if the achievement was unlocked and if it was unlocked within the last 24 hours
+                    if a.achieved == 1:
+                        unlocktime = datetime.strptime(a.unlocktime, '%d/%m/%y %H:%M:%S')
+                        if unlocktime and datetime.strptime(current_time, '%d/%m/%y %H:%M:%S') - unlocktime <= timedelta(days=20):
+                            achievements.append(a)
+
+                # Sort achievements by unlocktime
+                achievements.sort(key=lambda a: datetime.strptime(a.unlocktime, '%d/%m/%y %H:%M:%S'))
+
+                # Print achievements
+                for a in achievements:
+                    print(f"Name of Achievement: {a.name}")
+                    print(f"Date of Unlocktime: {a.unlocktime}")
+                    print(f"Details: {a.description}")
+                    print(f"Icon URL: {a.icon}")
+                    print()
 
 # Usage:
 #check_achievement_completion('76561198035515815', '504230', STEAM_API_KEY1)

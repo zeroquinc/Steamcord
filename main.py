@@ -1,6 +1,6 @@
 import asyncio
 
-from bot import DiscordBot
+from src.discord.bot import DiscordBot
 
 from config.globals import DISCORD_TOKEN
 

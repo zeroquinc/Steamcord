@@ -32,14 +32,17 @@ class Users:
         endpoint = "ISteamUserStats/GetPlayerAchievements/v0001"
         params = {"steamid": self.steam_id, "appid": app_id, "l": l}
         response = self.client._get(endpoint, params)
-        self.achievements = [UserAchievement(a) for a in response['playerstats']['achievements']]
+        if 'achievements' in response['playerstats']:
+            self.achievements = [UserAchievement(a) for a in response['playerstats']['achievements']]
+        else:
+            self.achievements = []
         return response
     
 class UserAchievement:
     def __init__(self, data):
         self.apiname = data['apiname']
         self.achieved = data['achieved']
-        self.unlocktime = data['unlocktime']
+        self.unlocktime = DateUtils.format_timestamp(data['unlocktime'])
         self.name = data['name']
         self.description = data.get('description', '')
         
@@ -55,7 +58,8 @@ class UserSummary:
 class UserOwnedGame:
     def __init__(self, game_dict):
         self.appid = game_dict['appid']
-        self.name = game_dict.get('name', '') 
+        self.name = game_dict.get('name', '')
+        self.url = f"https://store.steampowered.com/app/{game_dict['appid']}"
         try:
             self.last_played = DateUtils.format_timestamp(game_dict['rtime_last_played'])
         except KeyError:
