@@ -6,6 +6,7 @@ import json
 import os
 
 from api.client import SteamClient
+from config.globals import ACHIEVEMENT_TIME
 from utils.custom_logger import logger
 
 DATE_FORMAT = '%d/%m/%y %H:%M:%S'
@@ -77,7 +78,7 @@ async def get_recently_played_games(user):
     for user_game in user.owned_games:
         if user_game.last_played != "Unknown":
             last_played_date = datetime.strptime(user_game.last_played, DATE_FORMAT)
-            if datetime.strptime(current_time, DATE_FORMAT) - last_played_date <= timedelta(days=20):
+            if datetime.strptime(current_time, DATE_FORMAT) - last_played_date <= timedelta(minutes=ACHIEVEMENT_TIME):
                 recently_played_games.append(user_game)
     return recently_played_games
 
@@ -92,7 +93,7 @@ async def find_matching_achievements(user_achievement, game_achievements, curren
     for game_achievement in game_achievements:
         if game_achievement.displayname == user_achievement.name:
             unlocktime = datetime.strptime(user_achievement.unlocktime, DATE_FORMAT)
-            if unlocktime and datetime.strptime(current_time, DATE_FORMAT) - unlocktime <= timedelta(days=20):
+            if unlocktime and datetime.strptime(current_time, DATE_FORMAT) - unlocktime <= timedelta(minutes=ACHIEVEMENT_TIME):
                 matching_achievements.append((game_achievement, user_achievement, user_game, user))
     return matching_achievements
 

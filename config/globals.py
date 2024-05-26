@@ -11,3 +11,7 @@ DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
 STEAM_API_KEY1 = os.getenv("STEAM_API_KEY1")
 STEAM_API_KEY2 = os.getenv("STEAM_API_KEY2")
 STEAM_API_URL = "https://api.steampowered.com"
+
+# Tasks
+ACHIEVEMENT_TIME = int(os.getenv("ACHIEVEMENT_TIME")) # The time in minutes to check for new achievements
+ACHIEVEMENT_CHANNEL = os.getenv("ACHIEVEMENT_CHANNEL")
