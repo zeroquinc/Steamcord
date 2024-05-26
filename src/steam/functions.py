@@ -27,9 +27,16 @@ def get_achievement_info(achievement):
     return name, {'description': description, 'percentage': percentage}
 
 def write_achievements_to_file(achievement_dict, app_id):
-    file_path = os.path.join(os.path.dirname(__file__), 'data', f'achievements_{app_id}.json')
-    with open(file_path, 'w') as f:
-        json.dump(achievement_dict, f)
+    dir_path = os.path.join(os.path.dirname(__file__), 'data')
+    file_path = os.path.join(dir_path, f'achievements_{app_id}.json')
+    logger.debug(f'Writing achievements to file: {file_path}')
+    try:
+        os.makedirs(dir_path, exist_ok=True)  # This will create the directory if it doesn't exist
+        with open(file_path, 'w') as f:
+            json.dump(achievement_dict, f)
+        logger.debug(f'Successfully wrote achievements to file: {file_path}')
+    except Exception as e:
+        logger.error(f'Error writing achievements to file: {file_path}, Error: {e}')
 
 def scrape_all_achievements(app_id):
     soup = get_achievement_page(app_id)
