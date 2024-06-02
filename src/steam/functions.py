@@ -123,7 +123,6 @@ async def get_recent_achievements(game_achievements, user_achievements, user_gam
 async def get_all_achievements(user_ids, api_keys):
     all_achievements = []
     for user_id, api_key in zip(user_ids, api_keys):
-        logger.info(f"Using API key {api_key} for user {user_id}")
         achievements = await check_recently_played_games(user_id, api_key)
         all_achievements.extend(achievements)
     all_achievements.sort(key=lambda pair: datetime.strptime(pair[1].unlocktime, DATE_FORMAT))
