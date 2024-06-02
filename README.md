@@ -1,18 +1,32 @@
 # Steamcord
-A Discord bot for Steam embeds
+A Discord bot for Steam embedded notifications.
+
+- Shows the name of the achievement
+- The details of the achievement
+- The global percentage unlock rate of the achievement across Steam
+- Unlock date and time of the achievement
+- Your overall progress across that game
 
 ## Examples
 
 <table>
   <tr>
     <td>
-      <img src="" alt="image1">
+      <img src="https://github.com/zeroquinc/Steamcord/assets/39315068/663a3e7d-fc77-46b6-bcda-b2857a1c34e3" alt="image1">
     </td>
     <td>
-      <img src="" alt="image2">
+      <img src="https://github.com/zeroquinc/Steamcord/assets/39315068/03f05f3e-c136-434c-b8e7-40887382c47e" alt="image2">
     </td>
   </tr>
 </table>
+
+## How to use
+
+- Rename env to .env and fill in the variables
+- Pip install `requirements.txt`
+- Run `main.py`
+
+Your Steam ID can be found [here](https://www.steamidfinder.com/) and instructions on your API key can be found below
 
 ## Getting your Steam API Key
 
@@ -22,7 +36,9 @@ To get your Steam API Key, follow these steps:
 2. If you're not already logged in, you'll be asked to log in with your Steam account.
 3. Once logged in, you'll be asked to enter a domain name. This can be any valid domain name that you own, or a placeholder if you're just using the key for personal use.
 4. After entering a domain name, click on "Register".
-5. You'll be presented with your new API Key. Make sure to keep this key safe, as it gives access to Steam's APIs with your account.
+5. You'll be presented with your new API Key.
+
+Make sure to keep this key safe, as it gives access to Steam's APIs with your account.
 
 ## Getting a Discord Bot
 
@@ -40,10 +56,3 @@ To create a Discord bot, follow these steps:
 10. Copy the generated URL and open it in your web browser to add the bot to a server you have manage permissions on.
 
 Remember to keep your bot's token safe, as anyone with the token can control your bot.
-
-## How to use
-
-1. Fill in your Steam API key and Steam ID, your Steam ID can be found [here](https://www.steamidfinder.com/)
-2. Rename env to .env and fill in the variables
-3. Pip install `requirements.txt`
-4. Run `main.py`
