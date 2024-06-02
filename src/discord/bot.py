@@ -1,10 +1,6 @@
 import discord
 from discord.ext import commands
-import asyncio
 
-from src.steam.functions import get_all_achievements, create_embed_description
-from src.discord.embed import EmbedBuilder
-from config.globals import STEAM_API_KEY1, STEAM_API_KEY2
 from utils.custom_logger import logger
 
 class DiscordBot:
