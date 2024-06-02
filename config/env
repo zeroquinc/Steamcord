@@ -1,4 +1,6 @@
 # Discord Configuration
+# The Discord server ID is the ID of the server where the bot will post the achievements.
+# The Discord token is the token of the bot that will post the achievements.
 DISCORD_SERVER_ID =
 DISCORD_TOKEN =
 
@@ -18,5 +20,7 @@ STEAM_API_KEY ="API_KEY1,APIKEY2"
 STEAM_ID = "USER1,USER2"
 
 # Tasks
+# The achievement time is the time in seconds that the bot will wait before checking for new achievements.
+# The achievement channel is the channel ID where the bot will post the achievements.
 ACHIEVEMENT_TIME =
 ACHIEVEMENT_CHANNEL =
