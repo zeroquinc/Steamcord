@@ -7,6 +7,8 @@ import os
 
 from api.client import SteamClient
 from config.globals import ACHIEVEMENT_TIME
+from src.discord.embed import EmbedBuilder
+from utils.image import get_discord_color
 from utils.custom_logger import logger
 
 DATE_FORMAT = '%d/%m/%y %H:%M:%S'
@@ -56,16 +58,18 @@ def scrape_all_achievements(app_id):
 def load_achievements_from_file(app_id):
     file_path = os.path.join(os.path.dirname(__file__), 'data', f'achievements_{app_id}.json')
     try:
-        with open(file_path, 'r') as f:
+        with open(file_path, 'r', encoding='utf-8') as f:
             achievement_dict = json.load(f)
-        logger.info(f'Loaded achievements for app {app_id} from JSON file')
+        logger.debug(f'Loaded achievements for app {app_id} from JSON file')
     except FileNotFoundError:
-        logger.info(f'File not found, scraping achievements for app {app_id}')
+        logger.debug(f'File not found, scraping achievements for app {app_id}')
         achievement_dict = scrape_all_achievements(app_id)
     return achievement_dict
 
 def get_achievement_description(app_id, achievement_name):
     achievement_dict = load_achievements_from_file(app_id)
+    print(f"Looking for achievement: {achievement_name}")
+    print(f"Achievements in dict: {achievement_dict.keys()}")
     return achievement_dict.get(achievement_name)
 
 async def get_user_games(user_id, api_key):
@@ -87,11 +91,16 @@ async def get_recently_played_games(user):
 
 async def get_game_achievements(user_game, user, client):
     game_instance = client.game()
-    game_instance.get_game_achievements(user_game.appid)
+    try:
+        game_instance.get_game_achievements(user_game.appid)
+    except KeyError as e:
+        logger.error(f"Error processing achievements for game {user_game.appid}: {e}")
+        return None, None, 0
     user.get_user_achievements(user_game.appid)
+    if not game_instance.achievements:
+        return None, None, 0
     total_achievements = len(game_instance.achievements)
     return game_instance.achievements, user.achievements, total_achievements
-
 async def find_matching_achievements(user_achievement, game_achievements, current_time, user_game, user):
     matching_achievements = []
     for game_achievement in game_achievements:
@@ -102,6 +111,8 @@ async def find_matching_achievements(user_achievement, game_achievements, curren
     return matching_achievements
 
 async def get_recent_achievements(game_achievements, user_achievements, user_game, user):
+    if user_achievements is None:
+        return []
     current_time = datetime.now().strftime(DATE_FORMAT)
     achievements = []
 
@@ -146,6 +157,8 @@ async def check_recently_played_games(user_id, api_key):
         achievements = []
         for user_game in recently_played_games:
             result = await get_game_achievements(user_game, user, client)
+            if result is None:
+                continue
             logger.debug(f"get_game_achievements returned: {result}")
             game_achievement, user_achievement, total_achievements = result
             recent_achievements = await get_recent_achievements(game_achievement, user_achievement, user_game, user)
@@ -155,3 +168,11 @@ async def check_recently_played_games(user_id, api_key):
     except Exception as e:
         logger.error(f"Error processing achievements for user {user_id}: {e}")
         return []
+    
+async def create_and_send_embed(channel, game_achievement, user_achievement, user_game, user, total_achievements, current_count):
+    color = await get_discord_color(game_achievement.icon)
+    description, footer = create_embed_description_footer(user_achievement, user_game, current_count, total_achievements)
+    embed = EmbedBuilder(description=description, color=color)
+    embed.set_thumbnail(url=game_achievement.icon)
+    embed.set_footer(text=footer, icon_url=user.summary.avatarfull)
+    await embed.send_embed(channel)
