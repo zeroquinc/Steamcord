@@ -3,8 +3,19 @@ DISCORD_SERVER_ID =
 DISCORD_TOKEN =
 
 # Steam
-STEAM_API_KEY1 =
-STEAM_API_KEY2 =
+# Add your Steam API keys here, separated by commas.
+# Each API key corresponds to the user ID at the same position in the STEAM_ID variable.
+# For example, the first API key is used for the first user ID, the second API key is used for the second user ID, and so on.
+# If there are more user IDs than API keys, the extra user IDs will be ignored.
+# If there are more API keys than user IDs, the extra API keys will be ignored.
+STEAM_API_KEY ="API_KEY1,APIKEY2"
+
+# Add your Steam user IDs here, separated by commas.
+# Each user ID should correspond to an API key at the same position in the STEAM_API_KEY variable.
+# For example, the first user ID uses the first API key, the second user ID uses the second API key, and so on.
+# If there are more API keys than user IDs, the extra API keys will be ignored.
+# If there are more user IDs than API keys, the extra user IDs will be ignored.
+STEAM_ID = "USER1,USER2"
 
 # Tasks
 ACHIEVEMENT_TIME =
