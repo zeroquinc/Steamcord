@@ -11,6 +11,9 @@ from utils.custom_logger import logger
 
 DATE_FORMAT = '%d/%m/%y %H:%M:%S'
 
+# Define a dictionary to store the current count for each user
+user_current_counts = {}
+
 def normalize_whitespace(text):
     return re.sub(r'\s+', ' ', text).strip()
 
@@ -86,7 +89,8 @@ async def get_game_achievements(user_game, user, client):
     game_instance = client.game()
     game_instance.get_game_achievements(user_game.appid)
     user.get_user_achievements(user_game.appid)
-    return game_instance.achievements, user.achievements
+    total_achievements = len(game_instance.achievements)
+    return game_instance.achievements, user.achievements, total_achievements
 
 async def find_matching_achievements(user_achievement, game_achievements, current_time, user_game, user):
     matching_achievements = []
@@ -100,9 +104,20 @@ async def find_matching_achievements(user_achievement, game_achievements, curren
 async def get_recent_achievements(game_achievements, user_achievements, user_game, user):
     current_time = datetime.now().strftime(DATE_FORMAT)
     achievements = []
+
+    # Sort the user_achievements list by unlocktime in descending order
+    user_achievements.sort(key=lambda ua: ua.unlocktime, reverse=True)
+
+    current_count = len([ua for ua in user_achievements if ua.achieved == 1])
+
     for user_achievement in user_achievements:
         if user_achievement.achieved == 1:
-            achievements.extend(await find_matching_achievements(user_achievement, game_achievements, current_time, user_game, user))
+            matches = await find_matching_achievements(user_achievement, game_achievements, current_time, user_game, user)
+            for match in matches:
+                match += (current_count,)
+                achievements.append(match)
+                current_count -= 1  # Decrement the current count for each achievement
+
     return achievements
 
 async def get_all_achievements(user_ids, api_keys):
@@ -110,14 +125,18 @@ async def get_all_achievements(user_ids, api_keys):
     for user_id, api_key in zip(user_ids, api_keys):
         achievements = await check_recently_played_games(user_id, api_key)
         all_achievements.extend(achievements)
-    all_achievements.sort(key=lambda pair: datetime.strptime(pair[1].unlocktime, '%d/%m/%y %H:%M:%S'))
+    all_achievements.sort(key=lambda pair: datetime.strptime(pair[1].unlocktime, DATE_FORMAT))
     return all_achievements
 
-def create_embed_description(user_achievement, user_game):
+def create_embed_description_footer(user_achievement, user_game, total_achievements, current_count):
     if achievement_info := get_achievement_description(user_game.appid, user_achievement.name):
-        return f"**{user_achievement.name}** <:silver:1242467048035192955> **{achievement_info['percentage']}**\n{achievement_info['description']}\n\n[{user_game.name}]({user_game.url})"
+        description = f"**{user_achievement.name}** <:silver:1242467048035192955> **{achievement_info['percentage']}**\n{achievement_info['description']}\n\n[{user_game.name}]({user_game.url})"
     else:
-        return f"**{user_achievement.name}**\n\n{user_game.name}"
+        description = f"**{user_achievement.name}**"
+
+    completion_percentage = (current_count / total_achievements) * 100
+    footer = f"{user_achievement.unlocktime} • {current_count}/{total_achievements} ({completion_percentage:.2f}%)"
+    return description, footer
 
 async def check_recently_played_games(user_id, api_key):
     try:
@@ -126,9 +145,12 @@ async def check_recently_played_games(user_id, api_key):
         recently_played_games = await get_recently_played_games(user)
         achievements = []
         for user_game in recently_played_games:
-            game_achievements, user_achievements = await get_game_achievements(user_game, user, client)
-            recent_achievements = await get_recent_achievements(game_achievements, user_achievements, user_game, user)
-            achievements.extend(recent_achievements)
+            result = await get_game_achievements(user_game, user, client)
+            logger.debug(f"get_game_achievements returned: {result}")
+            game_achievement, user_achievement, total_achievements = result
+            recent_achievements = await get_recent_achievements(game_achievement, user_achievement, user_game, user)
+            for ach in recent_achievements:
+                achievements.append(ach + (total_achievements,))  # Create a new tuple that includes total achievements
         return achievements
     except Exception as e:
         logger.error(f"Error processing achievements for user {user_id}: {e}")

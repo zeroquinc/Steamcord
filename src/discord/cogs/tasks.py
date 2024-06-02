@@ -1,8 +1,9 @@
 import asyncio
 from discord.ext import tasks, commands
+from datetime import datetime
 
 from src.discord.embed import EmbedBuilder
-from src.steam.functions import get_all_achievements, create_embed_description
+from src.steam.functions import get_all_achievements, create_embed_description_footer
 from config.globals import STEAM_API_KEY1, STEAM_API_KEY2, ACHIEVEMENT_CHANNEL
 from utils.custom_logger import logger
 
@@ -21,16 +22,19 @@ class TasksCog(commands.Cog):
 
         all_achievements = await get_all_achievements(user_ids, api_keys)
 
+        # Sort all achievements by unlock time in descending order
+        all_achievements.sort(key=lambda a: datetime.strptime(a[1].unlocktime, "%d/%m/%y %H:%M:%S"), reverse=False)
+
         if all_achievements:
             logger.info("Found achievements")
         else:
             logger.info("No achievements found")
 
-        for game_achievement, user_achievement, user_game, user in all_achievements:
-            description = create_embed_description(user_achievement, user_game)
+        for game_achievement, user_achievement, user_game, user, total_achievements, current_count in all_achievements:
+            description, footer = create_embed_description_footer(user_achievement, user_game, current_count, total_achievements)
             embed = EmbedBuilder(description=description)
             embed.set_thumbnail(url=game_achievement.icon)
-            embed.set_footer(text=f"{user.summary.personaname} • {user_achievement.unlocktime}", icon_url=user.summary.avatarfull)
+            embed.set_footer(text=footer, icon_url=user.summary.avatarfull)
             await embed.send_embed(channel)
             await asyncio.sleep(1)
 
