@@ -22,5 +22,7 @@ STEAM_ID = "USER1,USER2"
 # Tasks
 # The achievement time is the time in seconds that the bot will wait before checking for new achievements.
 # The achievement channel is the channel ID where the bot will post the achievements.
+# The enable delay can be set to true or or false. If True, it will wait untill the next 00th minute to start the task.
 ACHIEVEMENT_TIME =
 ACHIEVEMENT_CHANNEL =
+ENABLE_DELAY = 
