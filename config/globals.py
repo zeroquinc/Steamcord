@@ -15,3 +15,6 @@ STEAM_API_URL = "https://api.steampowered.com"
 # Tasks
 ACHIEVEMENT_TIME = int(os.getenv("ACHIEVEMENT_TIME")) # The time in minutes to check for new achievements
 ACHIEVEMENT_CHANNEL = int(os.getenv("ACHIEVEMENT_CHANNEL")) # The channel to send the achievements to
+
+# Delay
+ENABLE_DELAY = os.getenv("ENABLE_DELAY") == "True"

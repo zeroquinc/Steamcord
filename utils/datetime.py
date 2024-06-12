@@ -17,3 +17,9 @@ class DateUtils:
     @staticmethod
     def format_timestamp(timestamp):
         return datetime.fromtimestamp(timestamp).strftime('%d/%m/%y %H:%M:%S')
+    
+    """Calculate the seconds until the next hour"""
+    @staticmethod
+    def seconds_until_next_hour():
+        now = datetime.now()
+        return (60 - now.minute) * 60 - now.second
