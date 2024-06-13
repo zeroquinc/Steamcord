@@ -68,9 +68,17 @@ def load_achievements_from_file(app_id):
 
 def get_achievement_description(app_id, achievement_name):
     achievement_dict = load_achievements_from_file(app_id)
-    print(f"Looking for achievement: {achievement_name}")
-    print(f"Achievements in dict: {achievement_dict.keys()}")
-    return achievement_dict.get(achievement_name)
+    logger.debug(f"Looking for achievement: {achievement_name}")
+    # Normalize the achievement_name before searching
+    achievement_name = achievement_name.strip().lower()
+    # Normalize the keys in achievement_dict
+    achievement_dict = {k.strip().lower(): v for k, v in achievement_dict.items()}
+    achievement = achievement_dict.get(achievement_name)
+    if achievement is None:
+        logger.debug(f"Achievement not found: {achievement_name}")
+    else:
+        logger.debug(f"Loaded achievement: {achievement}")
+    return achievement
 
 async def get_user_games(user_id, api_key):
     client = SteamClient(api_key)
@@ -101,6 +109,7 @@ async def get_game_achievements(user_game, user, client):
         return None, None, 0
     total_achievements = len(game_instance.achievements)
     return game_instance.achievements, user.achievements, total_achievements
+
 async def find_matching_achievements(user_achievement, game_achievements, current_time, user_game, user):
     matching_achievements = []
     for game_achievement in game_achievements:
@@ -139,15 +148,19 @@ async def get_all_achievements(user_ids, api_keys):
     all_achievements.sort(key=lambda pair: datetime.strptime(pair[1].unlocktime, DATE_FORMAT))
     return all_achievements
 
-def create_embed_description_footer(user_achievement, user_game, total_achievements, current_count):
+def create_embed_info(user_achievement, user_game, total_achievements, current_count, user):
     if achievement_info := get_achievement_description(user_game.appid, user_achievement.name):
-        description = f"**{user_achievement.name}** <:silver:1242467048035192955> **{achievement_info['percentage']}**\n{achievement_info['description']}\n\n[{user_game.name}]({user_game.url})"
+        title = f"{user_achievement.name}"
+        description = f"{achievement_info['description']}\n\n[{user_game.name}]({user_game.url})"
     else:
-        description = f"**{user_achievement.name}**"
+        title = f"{user_achievement.name}"
+        description = f"[{user_game.name}]({user_game.url})"
 
     completion_percentage = (current_count / total_achievements) * 100
-    footer = f"{user_achievement.unlocktime} • {current_count}/{total_achievements} ({completion_percentage:.2f}%)"
-    return description, footer
+    unlock_percentage = f"{achievement_info['percentage']}"
+    footer = f"{user.summary.personaname} • {user_achievement.unlocktime}"
+    completion_info = f"{current_count}/{total_achievements} ({completion_percentage:.2f}%)"
+    return title, description, completion_info, unlock_percentage, footer
 
 async def check_recently_played_games(user_id, api_key):
     try:
@@ -159,7 +172,6 @@ async def check_recently_played_games(user_id, api_key):
             result = await get_game_achievements(user_game, user, client)
             if result is None:
                 continue
-            logger.debug(f"get_game_achievements returned: {result}")
             game_achievement, user_achievement, total_achievements = result
             recent_achievements = await get_recent_achievements(game_achievement, user_achievement, user_game, user)
             for ach in recent_achievements:
@@ -171,8 +183,12 @@ async def check_recently_played_games(user_id, api_key):
     
 async def create_and_send_embed(channel, game_achievement, user_achievement, user_game, user, total_achievements, current_count):
     color = await get_discord_color(game_achievement.icon)
-    description, footer = create_embed_description_footer(user_achievement, user_game, current_count, total_achievements)
-    embed = EmbedBuilder(description=description, color=color)
+    title, description, completion_info, unlock_percentage, footer = create_embed_info(user_achievement, user_game, current_count, total_achievements, user)
+    embed = EmbedBuilder(title=title, description=description, color=color)
     embed.set_thumbnail(url=game_achievement.icon)
+    embed.set_author(name="Achievement unlocked", icon_url=user_game.game_icon)
+    embed.add_field(name="Unlock Ratio", value=unlock_percentage, inline=True)
+    embed.add_field(name="Progress", value=completion_info, inline=True)
     embed.set_footer(text=footer, icon_url=user.summary.avatarfull)
+    logger.info(f"Sending embed for {user.summary.personaname}: {user_achievement.name} ({user_game.name})")
     await embed.send_embed(channel)
