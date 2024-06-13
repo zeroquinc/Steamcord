@@ -61,6 +61,8 @@ class UserOwnedGame:
         self.name = game_dict.get('name', '')
         self.url = f"https://store.steampowered.com/app/{game_dict['appid']}"
         try:
+            self.game_icon = f"http://media.steampowered.com/steamcommunity/public/images/apps/{game_dict['appid']}/{game_dict['img_icon_url']}.jpg"
             self.last_played = DateUtils.format_timestamp(game_dict['rtime_last_played'])
         except KeyError:
+            self.game_icon = ""
             self.last_played = "Unknown"

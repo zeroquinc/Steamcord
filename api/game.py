@@ -10,7 +10,6 @@ class Game:
         endpoint = 'ISteamUserStats/GetSchemaForGame/v2/'
         params = {'key': self.client.api_key, 'appid': app_id, 'l': l}
         response = self.client._get(endpoint, params)
-        print(response)
         self.gamename = response['game']['gameName']
         self.gameversion = response['game']['gameVersion']
         if 'achievements' in response['game']['availableGameStats']:

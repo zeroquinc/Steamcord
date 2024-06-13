@@ -20,11 +20,11 @@ class TasksCog(commands.Cog):
         all_achievements = await get_all_achievements(user_ids, api_keys)
         # Sort all achievements by unlock time in descending order and then by order they were achieved in ascending order
         all_achievements.sort(key=lambda a: (datetime.strptime(a[1].unlocktime, "%d/%m/%y %H:%M:%S"), a[4]/a[5]), reverse=False)
-        if all_achievements:
-            logger.info("Found achievements! Sending embeds...")
-        else:
-            logger.info("No achievements found...")
+        logged_users = set() # Set to keep track of users that have already been logged
         for game_achievement, user_achievement, user_game, user, total_achievements, current_count in all_achievements:
+            if user.summary.personaname not in logged_users:
+                logger.info(f"Found achievements for {user.summary.personaname}")
+                logged_users.add(user.summary.personaname)
             await create_and_send_embed(channel, game_achievement, user_achievement, user_game, user, total_achievements, current_count)
             await asyncio.sleep(1)
 
