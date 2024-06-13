@@ -3,7 +3,7 @@ from datetime import datetime
 import asyncio
 
 from src.steam.functions import get_all_achievements, create_and_send_embed
-from config.globals import STEAM_API_KEY, ACHIEVEMENT_CHANNEL, STEAM_ID
+from config.globals import STEAM_API_KEY, ACHIEVEMENT_CHANNEL, STEAM_ID, INTERVAL_MINUTES
 from utils.custom_logger import logger
 
 class TasksCog(commands.Cog):
@@ -11,7 +11,7 @@ class TasksCog(commands.Cog):
         self.bot = bot
         self.process_achievements.start()  # Always start the task when the cog is loaded
 
-    @tasks.loop(minutes=60)
+    @tasks.loop(minutes=INTERVAL_MINUTES)
     async def process_achievements(self):
         logger.info("Searching for Steam Achievements...")
         user_ids = STEAM_ID

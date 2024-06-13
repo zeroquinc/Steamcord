@@ -25,4 +25,5 @@ STEAM_ID = "USER1,USER2"
 # The enable delay can be set to true or or false. If True, it will wait untill the next 00th minute to start the task.
 ACHIEVEMENT_TIME =
 ACHIEVEMENT_CHANNEL =
+INTERVAL_MINUTES =
 ENABLE_DELAY = 
