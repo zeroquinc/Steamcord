@@ -6,7 +6,7 @@ import json
 import os
 
 from api.client import SteamClient
-from config.globals import ACHIEVEMENT_TIME
+from config.globals import ACHIEVEMENT_TIME, PLATINUM_ICON
 from src.discord.embed import EmbedBuilder
 from utils.image import get_discord_color
 from utils.custom_logger import logger
@@ -192,3 +192,13 @@ async def create_and_send_embed(channel, game_achievement, user_achievement, use
     embed.set_footer(text=footer, icon_url=user.summary.avatarfull)
     logger.info(f"Sending embed for {user.summary.personaname}: {user_achievement.name} ({user_game.name})")
     await embed.send_embed(channel)
+
+async def create_and_send_completion_embed(completion_channel, user_game, user, total_achievements):
+    color = await get_discord_color(user_game.game_icon)
+    description = f"{user.summary.personaname} has completed all {total_achievements} achievements for [{user_game.name}]({user_game.url})!"
+    embed = EmbedBuilder(description=description, color=color)
+    embed.set_author(name="Platinum unlocked", icon_url=PLATINUM_ICON)
+    embed.set_thumbnail(url=user_game.game_icon)
+    embed.set_footer(text=user.summary.personaname, icon_url=user.summary.avatarfull)
+    logger.info(f"Sending completion embed for {user.summary.personaname}: All achievements ({user_game.name})")
+    await embed.send_embed(completion_channel)

@@ -15,6 +15,8 @@ STEAM_API_URL = "https://api.steampowered.com"
 # Tasks
 ACHIEVEMENT_TIME = int(os.getenv("ACHIEVEMENT_TIME")) # The time in minutes to check for new achievements
 ACHIEVEMENT_CHANNEL = int(os.getenv("ACHIEVEMENT_CHANNEL")) # The channel to send the achievements to
+PLATINUM_CHANNEL = int(os.getenv("PLATINUM_CHANNEL")) # The channel to send the platinum achievements to
+PLATINUM_ICON = "https://i.imgur.com/i4GXkrq.png"
 INTERVAL_MINUTES = int(os.getenv("INTERVAL_MINUTES")) # The interval in minutes to check for new achievements
 
 # Delay
