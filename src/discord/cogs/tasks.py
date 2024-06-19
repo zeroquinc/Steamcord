@@ -26,7 +26,7 @@ class TasksCog(commands.Cog):
                 logger.info(f"Found achievements for {user.summary.personaname}")
                 logged_users.add(user.summary.personaname)
             await create_and_send_embed(channel, game_achievement, user_achievement, user_game, user, total_achievements, current_count)
-            completion_key = (user.summary.steamid, user_game.appid)  # Unique key for each user-game combination
+            completion_key = (user.summary.personaname, user_game.appid)  # Unique key for each user-game combination
             if current_count == total_achievements and completion_key not in self.completed_games:
                 completion_channel = self.bot.get_channel(PLATINUM_CHANNEL)
                 await create_and_send_completion_embed(completion_channel, user_game, user, total_achievements)
