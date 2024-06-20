@@ -9,6 +9,7 @@ from api.client import SteamClient
 from config.globals import ACHIEVEMENT_TIME, PLATINUM_ICON
 from src.discord.embed import EmbedBuilder
 from utils.image import get_discord_color
+from utils.datetime import DateUtils
 from utils.custom_logger import logger
 
 DATE_FORMAT = '%d/%m/%y %H:%M:%S'
@@ -66,6 +67,26 @@ def load_achievements_from_file(app_id):
         achievement_dict = scrape_all_achievements(app_id)
     return achievement_dict
 
+def find_rarest_achievement(app_id):
+    achievement_dict = load_achievements_from_file(app_id)
+    if not achievement_dict:
+        return None
+    
+    lowest_percentage = None
+    rarest_achievement_name = None
+    for name, info in achievement_dict.items():
+        percentage_str = info.get('percentage', 'Unknown')
+        if percentage_str != 'Unknown':
+            percentage = float(percentage_str.replace('%', ''))
+            if lowest_percentage is None or percentage < lowest_percentage:
+                lowest_percentage = percentage
+                rarest_achievement_name = name
+    
+    if rarest_achievement_name:
+        return f"{rarest_achievement_name} ({lowest_percentage}%)"
+    else:
+        return None
+
 def get_achievement_description(app_id, achievement_name):
     achievement_dict = load_achievements_from_file(app_id)
     logger.debug(f"Looking for achievement: {achievement_name}")
@@ -118,6 +139,37 @@ async def find_matching_achievements(user_achievement, game_achievements, curren
             if unlocktime and datetime.strptime(current_time, DATE_FORMAT) - unlocktime <= timedelta(minutes=ACHIEVEMENT_TIME):
                 matching_achievements.append((game_achievement, user_achievement, user_game, user))
     return matching_achievements
+
+def calculate_completion_time_span(data):
+    # Check if the data structure is as expected and contains 'playerstats' and 'achievements'
+    if isinstance(data, dict) and 'playerstats' in data and \
+       isinstance(data['playerstats'], dict) and 'achievements' in data['playerstats']:
+        user_achievements = data['playerstats']['achievements']
+    else:
+        logger.error("Invalid data format. Expected 'playerstats' and 'achievements' keys.")
+        return None
+
+    unlock_times = []
+    for ua in user_achievements:
+        if isinstance(ua, dict) and 'unlocktime' in ua:
+            try:
+                unlock_time = DateUtils.convert_to_datetime(ua['unlocktime'])
+                unlock_times.append(unlock_time)
+            except ValueError as e:
+                # Assuming ua['name'] exists for logging purposes
+                logger.error(f"Error converting unlocktime for achievement {ua.get('name', 'Unknown')}: {e}")
+        else:
+            # Log an error or handle unexpected data format
+            logger.error(f"Unexpected data format for achievement: {ua}")
+
+    if not unlock_times:
+        return None
+
+    first_unlocktime = min(unlock_times)
+    latest_unlocktime = max(unlock_times)
+    time_span = DateUtils.calculate_time_span(first_unlocktime, latest_unlocktime)
+
+    return DateUtils.format_time_span(time_span)
 
 async def get_recent_achievements(game_achievements, user_achievements, user_game, user):
     if user_achievements is None:
@@ -182,7 +234,7 @@ async def check_recently_played_games(user_id, api_key):
         return []
     
 async def create_and_send_embed(channel, game_achievement, user_achievement, user_game, user, total_achievements, current_count):
-    color = await get_discord_color(game_achievement.icon)
+    color = await get_discord_color(user_game.game_icon)
     title, description, completion_info, unlock_percentage, footer = create_embed_info(user_achievement, user_game, current_count, total_achievements, user)
     embed = EmbedBuilder(title=title, description=description, color=color)
     embed.set_thumbnail(url=game_achievement.icon)
@@ -193,12 +245,18 @@ async def create_and_send_embed(channel, game_achievement, user_achievement, use
     logger.info(f"Sending embed for {user.summary.personaname}: {user_achievement.name} ({user_game.name})")
     await embed.send_embed(channel)
 
-async def create_and_send_completion_embed(completion_channel, user_game, user, total_achievements):
+async def create_and_send_completion_embed(completion_channel, user_game, user, total_achievements, latest_unlocktime):
     color = await get_discord_color(user_game.game_icon)
-    description = f"{user.summary.personaname} has completed all {total_achievements} achievements for [{user_game.name}]({user_game.url})!"
+    description = f"[{user.summary.personaname}]({user.summary.profileurl}) has completed all {total_achievements} achievements for [{user_game.name}]({user_game.url})!"
     embed = EmbedBuilder(description=description, color=color)
+    completion_time_span = calculate_completion_time_span(user.get_user_achievements(user_game.appid))
+    completion_time = str(completion_time_span).split('.')[0]  # Convert to string and remove microseconds
+    # Get the description of the rarest achievement
+    rarest_achievement = find_rarest_achievement(user_game.appid)
+    if rarest_achievement:
+        embed.add_field(name="Rarest Achievement", value=rarest_achievement, inline=False)
     embed.set_author(name="Platinum unlocked", icon_url=PLATINUM_ICON)
     embed.set_thumbnail(url=user_game.game_icon)
-    embed.set_footer(text=user.summary.personaname, icon_url=user.summary.avatarfull)
+    embed.set_footer(text=f"Platinum in {completion_time}", icon_url=user.summary.avatarfull)
     logger.info(f"Sending completion embed for {user.summary.personaname}: All achievements ({user_game.name})")
     await embed.send_embed(completion_channel)
