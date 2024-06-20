@@ -23,3 +23,28 @@ class DateUtils:
     def seconds_until_next_hour():
         now = datetime.now()
         return (60 - now.minute) * 60 - now.second
+    
+    @staticmethod
+    def convert_to_datetime(unix_timestamp):
+        try:
+            return datetime.fromtimestamp(int(unix_timestamp))
+        except ValueError as e:
+            # Handle or log the error as needed
+            raise ValueError(f"Error converting Unix timestamp: {e}") from e
+
+    @staticmethod
+    def calculate_time_span(start_date, end_date):
+        return end_date - start_date
+
+    @staticmethod
+    def format_time_span(time_span):
+        days, seconds = time_span.days, time_span.seconds
+        years, days = divmod(days, 365)
+        hours = seconds // 3600
+
+        if years > 0:
+            return f"{years} years, {days} days and {hours} hours"
+        elif days > 0:
+            return f"{days} days and {hours} hours"
+        else:
+            return f"{hours} hours"

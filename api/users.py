@@ -33,19 +33,20 @@ class Users:
         params = {"steamid": self.steam_id, "appid": app_id, "l": l}
         response = self.client._get(endpoint, params)
         if 'achievements' in response['playerstats']:
-            self.achievements = [UserAchievement(a) for a in response['playerstats']['achievements']]
+            self.achievements = [UserAchievement(a, app_id) for a in response['playerstats']['achievements']]
         else:
             self.achievements = []
         return response
-    
+
 class UserAchievement:
-    def __init__(self, data):
+    def __init__(self, data, appid):  # Add appid parameter
+        self.appid = appid  # Store appid
         self.apiname = data['apiname']
         self.achieved = data['achieved']
         self.unlocktime = DateUtils.format_timestamp(data['unlocktime'])
         self.name = data['name']
         self.description = data.get('description', '')
-        
+
 class UserSummary:
     def __init__(self, data):
         self.personaname = data['personaname']
