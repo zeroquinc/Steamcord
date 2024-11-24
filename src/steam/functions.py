@@ -20,8 +20,8 @@ user_current_counts = {}
 def normalize_whitespace(text):
     return re.sub(r'\s+', ' ', text).strip()
 
-def get_achievement_page(app_id):
-    url = f"https://completionist.me/steam/app/{app_id}/achievements"
+def get_achievement_page(app_id, page=1):
+    url = f"https://completionist.me/steam/app/{app_id}/achievements?display=list&sort=created&order=desc&page={page}"
     response = requests.get(url)
     return BeautifulSoup(response.text, 'html.parser')
 
@@ -46,13 +46,23 @@ def write_achievements_to_file(achievement_dict, app_id):
         logger.error(f'Error writing achievements to file: {file_path}, Error: {e}')
 
 def scrape_all_achievements(app_id):
-    soup = get_achievement_page(app_id)
-    achievements = soup.find_all('strong')
+    page = 1
     achievement_dict = {}
-    for achievement in achievements:
-        name, info = get_achievement_info(achievement)
-        if name:
-            achievement_dict[name] = info
+    
+    while True:
+        soup = get_achievement_page(app_id, page)
+        achievements = soup.find_all('strong')  # Adjust this selector if needed for accuracy
+        
+        if not achievements:  # If no achievements are found, exit the loop
+            break
+
+        for achievement in achievements:
+            name, info = get_achievement_info(achievement)
+            if name:
+                achievement_dict[name] = info
+        
+        page += 1  # Move to the next page
+
     write_achievements_to_file(achievement_dict, app_id)
     return achievement_dict
 
