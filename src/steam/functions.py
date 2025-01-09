@@ -14,57 +14,132 @@ from utils.custom_logger import logger
 
 DATE_FORMAT = '%d/%m/%y %H:%M:%S'
 
+# Mapping of tag IDs to descriptions
+TAG_MAPPING = {
+    3: "Main Storyline",
+    9: "Collectible",
+    13: "Choice Dependent",
+    11: "Speedrun",
+    1: "Missable"
+}
+
 # Define a dictionary to store the current count for each user
 user_current_counts = {}
 
 def normalize_whitespace(text):
     return re.sub(r'\s+', ' ', text).strip()
 
-def get_achievement_page(app_id, page=1):
-    url = f"https://completionist.me/steam/app/{app_id}/achievements?display=list&sort=created&order=desc&page={page}"
+def get_achievement_page(app_id):
+    url = f"https://steamhunters.com/apps/{app_id}/achievements"
     response = requests.get(url)
     return BeautifulSoup(response.text, 'html.parser')
 
 def get_achievement_info(achievement):
-    name = normalize_whitespace(achievement.text)
-    description_span = achievement.find_next_sibling('span', class_='text-muted')
-    description = normalize_whitespace(description_span.text) if description_span else None
-    percentage_tds = achievement.parent.find_next_siblings('td', class_='text-center')
-    percentage = normalize_whitespace(percentage_tds[1].find('small').text) if len(percentage_tds) > 1 and percentage_tds[1].find('small') else 'Unknown'
-    return name, {'description': description, 'percentage': percentage}
+    # Extract information from the parsed JSON-like structure in the page
+    try:
+        api_name = achievement.get('apiName', 'Unknown')
+        name = achievement.get('name', 'Unknown')
+        description = achievement.get('description', 'No description provided')
+        percentage = achievement.get('steamPercentage', 'Unknown')
+        points = achievement.get('points', 'Unknown')
+        
+        return name, {
+            'api_name': api_name,
+            'description': description,
+            'percentage': percentage,
+            'points': points
+        }
+    except KeyError as e:
+        print(f"Error extracting achievement info: {e}")
+        return None, None
 
 def write_achievements_to_file(achievement_dict, app_id):
     dir_path = os.path.join(os.path.dirname(__file__), 'data')
     file_path = os.path.join(dir_path, f'achievements_{app_id}.json')
-    logger.debug(f'Writing achievements to file: {file_path}')
+    print(f'Writing achievements to file: {file_path}')
     try:
-        os.makedirs(dir_path, exist_ok=True)  # This will create the directory if it doesn't exist
+        os.makedirs(dir_path, exist_ok=True)
         with open(file_path, 'w') as f:
-            json.dump(achievement_dict, f)
-        logger.debug(f'Successfully wrote achievements to file: {file_path}')
+            json.dump(achievement_dict, f, indent=4)
+        print(f'Successfully wrote achievements to file: {file_path}')
     except Exception as e:
-        logger.error(f'Error writing achievements to file: {file_path}, Error: {e}')
+        print(f'Error writing achievements to file: {file_path}, Error: {e}')
+
+import re
+
+# Mapping of tag IDs to descriptions
+TAG_MAPPING = {
+    3: "Main Storyline",
+    9: "Collectible",
+    13: "Choice Dependent",
+    11: "Speedrun",
+    1: "Missable"
+}
 
 def scrape_all_achievements(app_id):
-    page = 1
-    achievement_dict = {}
-    
-    while True:
-        soup = get_achievement_page(app_id, page)
-        achievements = soup.find_all('strong')  # Adjust this selector if needed for accuracy
-        
-        if not achievements:  # If no achievements are found, exit the loop
-            break
+    logger.debug(f"Scraping achievements for app ID: {app_id}")
+    soup = get_achievement_page(app_id)
+
+    script_tag = soup.find('script', text=lambda t: 'var sh =' in t if t else False)
+    if not script_tag:
+        logger.error("Error: Could not find the achievement data on the page.")
+        return {}
+
+    try:
+        script_content = script_tag.string
+        start_index = script_content.find('model:') + len('model:')
+        end_index = script_content.find('requestHttpMethod:')
+
+        if end_index == -1:
+            raw_json = script_content[start_index:].strip().rstrip(',').strip()
+        else:
+            raw_json = script_content[start_index:end_index].strip().rstrip(',').strip()
+
+        logger.debug(f"Extracted raw JSON length: {len(raw_json)}")
+
+        # Replace `new Date(...)` with a placeholder or remove it
+        raw_json = re.sub(r'new Date\([0-9]+\)', '"PLACEHOLDER_DATE"', raw_json)
+
+        if not raw_json or not raw_json.startswith('{') or not raw_json.endswith('}'):
+            logger.error("Extracted JSON appears incomplete or invalid.")
+            return {}
+
+        data = json.loads(raw_json)
+        achievements = data['listData']['pagedList']['items']
+        achievement_dict = {}
 
         for achievement in achievements:
             name, info = get_achievement_info(achievement)
             if name:
-                achievement_dict[name] = info
-        
-        page += 1  # Move to the next page
+                # Use only steamPercentage and round it to 1 decimal place
+                steam_percentage = round(achievement.get("steamPercentage", 0), 1)
+                
+                # Round points to a whole number
+                points = round(achievement.get("points", 0))
 
-    write_achievements_to_file(achievement_dict, app_id)
-    return achievement_dict
+                # Extract and map tags
+                tags = achievement.get("tagVotes", [])
+                mapped_tags = [TAG_MAPPING[tag["tagId"]] for tag in tags if tag["tagId"] in TAG_MAPPING]
+
+                # Build the final info dictionary
+                info.update({
+                    "steamPercentage": steam_percentage,
+                    "points": points,
+                    "tags": mapped_tags
+                })
+
+                achievement_dict[name] = info
+
+        logger.debug(f"Parsed achievement data for app ID {app_id}: {achievement_dict}")
+        write_achievements_to_file(achievement_dict, app_id)
+        return achievement_dict
+
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON decoding error for app ID {app_id}: {e.doc[e.pos-50:e.pos+50]}")
+    except Exception as e:
+        logger.error(f"Error parsing achievements data for app ID {app_id}: {e}")
+
+    return {}
 
 def load_achievements_from_file(app_id):
     file_path = os.path.join(os.path.dirname(__file__), 'data', f'achievements_{app_id}.json')
@@ -214,15 +289,23 @@ def create_embed_info(user_achievement, user_game, total_achievements, current_c
     if achievement_info := get_achievement_description(user_game.appid, user_achievement.name):
         title = f"{user_achievement.name}"
         description = f"{achievement_info['description']}\n\n[{user_game.name}]({user_game.url})"
+        points = achievement_info.get("points", 0)  # Extract points
+        tags = achievement_info.get("tags", [])     # Extract tags
     else:
         title = f"{user_achievement.name}"
         description = f"[{user_game.name}]({user_game.url})"
+        points = 0  # Default points if not available
+        tags = []
+
+    logger.debug(f"Preparing to send embed for achievement: {user_achievement.name} in game: {user_game.name}")
 
     completion_percentage = (current_count / total_achievements) * 100
-    unlock_percentage = f"{achievement_info['percentage']}"
+    unlock_percentage = f"{achievement_info['steamPercentage']}"
     footer = f"{user.summary.personaname} • {user_achievement.unlocktime}"
     completion_info = f"{current_count}/{total_achievements} ({completion_percentage:.2f}%)"
-    return title, description, completion_info, unlock_percentage, footer
+    
+    return title, description, completion_info, unlock_percentage, footer, points, tags
+
 
 async def check_recently_played_games(user_id, api_key):
     try:
@@ -245,14 +328,30 @@ async def check_recently_played_games(user_id, api_key):
     
 async def create_and_send_embed(channel, game_achievement, user_achievement, user_game, user, total_achievements, current_count):
     color = await get_discord_color(user_game.game_icon)
-    title, description, completion_info, unlock_percentage, footer = create_embed_info(user_achievement, user_game, current_count, total_achievements, user)
+    
+    # Get information for the embed
+    title, description, completion_info, unlock_percentage, footer, points, tags = create_embed_info(user_achievement, user_game, current_count, total_achievements, user)
+    
+    # Create the embed
     embed = EmbedBuilder(title=title, description=description, color=color)
     embed.set_thumbnail(url=game_achievement.icon)
     embed.set_author(name="Achievement unlocked", icon_url=user_game.game_icon)
-    embed.add_field(name="Unlock Ratio", value=unlock_percentage, inline=True)
+    
+    # Add Tags field only if there are tags
+    if tags:  # Only add if tags are not empty
+        embed.add_field(name="Category", value=", ".join(tags), inline=False)
+    
+    # Add Points field
+    embed.add_field(name="Points", value=str(points), inline=True)
+    
+    # Add the existing fields
+    embed.add_field(name="Unlock Ratio", value=f"{unlock_percentage}%", inline=True)
     embed.add_field(name="Progress", value=completion_info, inline=True)
     embed.set_footer(text=footer, icon_url=user.summary.avatarfull)
+    
     logger.info(f"Sending embed for {user.summary.personaname}: {user_achievement.name} ({user_game.name})")
+    
+    # Send the embed to the channel
     await embed.send_embed(channel)
 
 async def create_and_send_completion_embed(completion_channel, user_game, user, total_achievements, latest_unlocktime):
