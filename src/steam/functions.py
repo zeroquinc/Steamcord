@@ -65,17 +65,6 @@ def write_achievements_to_file(achievement_dict, app_id):
     except Exception as e:
         print(f'Error writing achievements to file: {file_path}, Error: {e}')
 
-import re
-
-# Mapping of tag IDs to descriptions
-TAG_MAPPING = {
-    3: "Main Storyline",
-    9: "Collectible",
-    13: "Choice Dependent",
-    11: "Speedrun",
-    1: "Missable"
-}
-
 def scrape_all_achievements(app_id):
     logger.debug(f"Scraping achievements for app ID: {app_id}")
     soup = get_achievement_page(app_id)
@@ -160,12 +149,17 @@ def find_rarest_achievement(app_id):
     lowest_percentage = None
     rarest_achievement_name = None
     for name, info in achievement_dict.items():
-        percentage_str = info.get('percentage', 'Unknown')
-        if percentage_str != 'Unknown':
-            percentage = float(percentage_str.replace('%', ''))
-            if lowest_percentage is None or percentage < lowest_percentage:
-                lowest_percentage = percentage
-                rarest_achievement_name = name
+        percentage_value = info.get('steamPercentage', 'Unknown')
+        if isinstance(percentage_value, (int, float)):
+            percentage = float(percentage_value)
+        elif isinstance(percentage_value, str):
+            percentage = float(percentage_value.replace('%', ''))
+        else:
+            continue
+        
+        if lowest_percentage is None or percentage < lowest_percentage:
+            lowest_percentage = percentage
+            rarest_achievement_name = name
     
     if rarest_achievement_name:
         return f"{rarest_achievement_name} ({lowest_percentage}%)"
