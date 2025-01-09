@@ -341,11 +341,9 @@ async def create_and_send_embed(channel, game_achievement, user_achievement, use
     if tags:  # Only add if tags are not empty
         embed.add_field(name="Category", value=", ".join(tags), inline=False)
     
-    # Add Points field
-    embed.add_field(name="Points", value=str(points), inline=True)
-    
     # Add the existing fields
     embed.add_field(name="Unlock Ratio", value=f"{unlock_percentage}%", inline=True)
+    embed.add_field(name="Points", value=str(points), inline=True)
     embed.add_field(name="Progress", value=completion_info, inline=True)
     embed.set_footer(text=footer, icon_url=user.summary.avatarfull)
     
