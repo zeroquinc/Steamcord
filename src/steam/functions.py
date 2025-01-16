@@ -16,7 +16,7 @@ DATE_FORMAT = '%d/%m/%y %H:%M:%S'
 
 # Mapping of tag IDs to descriptions
 TAG_MAPPING = {
-    3: "Main Storyline",
+    3: "Story",
     9: "Collectible",
     13: "Choice Dependent",
     11: "Speedrun",
@@ -108,7 +108,10 @@ def scrape_all_achievements(app_id):
 
                 # Extract and map tags
                 tags = achievement.get("tagVotes", [])
-                mapped_tags = [TAG_MAPPING[tag["tagId"]] for tag in tags if tag["tagId"] in TAG_MAPPING]
+                
+                # Use a set to avoid duplicate tags
+                unique_tags = {TAG_MAPPING[tag["tagId"]] for tag in tags if tag["tagId"] in TAG_MAPPING}
+                mapped_tags = list(unique_tags)
 
                 # Build the final info dictionary
                 info.update({
@@ -282,7 +285,7 @@ async def get_all_achievements(user_ids, api_keys):
 def create_embed_info(user_achievement, user_game, total_achievements, current_count, user):
     if achievement_info := get_achievement_description(user_game.appid, user_achievement.name):
         title = f"{user_achievement.name}"
-        description = f"{achievement_info['description']}\n\n[{user_game.name}]({user_game.url})"
+        description = f"{achievement_info['description']}"
         points = achievement_info.get("points", 0)  # Extract points
         tags = achievement_info.get("tags", [])     # Extract tags
     else:
@@ -331,13 +334,15 @@ async def create_and_send_embed(channel, game_achievement, user_achievement, use
     embed.set_thumbnail(url=game_achievement.icon)
     embed.set_author(name="Achievement unlocked", icon_url=user_game.game_icon)
     
+    embed.add_field(name="Game", value=f"[{user_game.name}]({user_game.url})", inline=False)
+    
     # Add Tags field only if there are tags
     if tags:  # Only add if tags are not empty
-        embed.add_field(name="Category", value=", ".join(tags), inline=False)
+        embed.add_field(name="Type", value=", ".join(tags), inline=False)
     
     # Add the existing fields
-    embed.add_field(name="Unlock Ratio", value=f"{unlock_percentage}%", inline=True)
     embed.add_field(name="Points", value=str(points), inline=True)
+    embed.add_field(name="Ratio", value=f"{unlock_percentage}%", inline=True)
     embed.add_field(name="Progress", value=completion_info, inline=True)
     embed.set_footer(text=footer, icon_url=user.summary.avatarfull)
     
