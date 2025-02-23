@@ -28,6 +28,7 @@ def create_logger():
         format=log_format,
         colorize=True, # Colorize for console output
     )
+
 def switch_logger():
     """
     Switches the logger configuration based on the log level.
