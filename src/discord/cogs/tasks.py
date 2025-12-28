@@ -9,7 +9,9 @@ from utils.custom_logger import logger
 class TasksCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.process_achievements.start()  # Always start the task when the cog is loaded
+        # Start the task only if it's not already running (prevents duplicate loops on reloads)
+        if not self.process_achievements.is_running():
+            self.process_achievements.start()
         self.completed_games = set()  # Initialize a set to track completed games
 
     @tasks.loop(minutes=INTERVAL_MINUTES)
@@ -50,6 +52,11 @@ class TasksCog(commands.Cog):
                 await create_and_send_completion_embed(completion_channel, user_game, user, total_achievements, latest_unlocktime)
                 self.completed_games.add(completion_key)  # Mark this game as completed for this user
             await asyncio.sleep(1)
+
+    @process_achievements.before_loop
+    async def before_process_achievements(self):
+        # Ensure the bot is ready before starting the background task
+        await self.bot.wait_until_ready()
 
 async def setup(bot):
     await bot.add_cog(TasksCog(bot))
