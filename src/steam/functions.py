@@ -1,10 +1,6 @@
 from datetime import datetime, timedelta
-import requests
-from bs4 import BeautifulSoup
-import re
-import json
-import os
 
+import discord
 from api.client import SteamClient
 from config.globals import ACHIEVEMENT_TIME, PLATINUM_ICON
 from src.discord.embed import EmbedBuilder
@@ -14,174 +10,9 @@ from utils.custom_logger import logger
 
 DATE_FORMAT = '%d/%m/%y %H:%M:%S'
 
-# Mapping of tag IDs to descriptions
-TAG_MAPPING = {
-    3: "Story",
-    9: "Collectible",
-    13: "Choice Dependent",
-    11: "Speedrun",
-    1: "Missable"
-}
-
-# Define a dictionary to store the current count for each user
+# Scraping from steamhunters has been removed (site now blocks scraping).
+# The data-dependent helpers were deleted. Keep a small store for runtime counts.
 user_current_counts = {}
-
-def normalize_whitespace(text):
-    return re.sub(r'\s+', ' ', text).strip()
-
-def get_achievement_page(app_id):
-    url = f"https://steamhunters.com/apps/{app_id}/achievements"
-    response = requests.get(url)
-    return BeautifulSoup(response.text, 'html.parser')
-
-def get_achievement_info(achievement):
-    # Extract information from the parsed JSON-like structure in the page
-    try:
-        api_name = achievement.get('apiName', 'Unknown')
-        name = achievement.get('name', 'Unknown')
-        description = achievement.get('description', 'No description provided')
-        percentage = achievement.get('steamPercentage', 'Unknown')
-        points = achievement.get('points', 'Unknown')
-        
-        return name, {
-            'api_name': api_name,
-            'description': description,
-            'percentage': percentage,
-            'points': points
-        }
-    except KeyError as e:
-        print(f"Error extracting achievement info: {e}")
-        return None, None
-
-def write_achievements_to_file(achievement_dict, app_id):
-    dir_path = os.path.join(os.path.dirname(__file__), 'data')
-    file_path = os.path.join(dir_path, f'achievements_{app_id}.json')
-    print(f'Writing achievements to file: {file_path}')
-    try:
-        os.makedirs(dir_path, exist_ok=True)
-        with open(file_path, 'w') as f:
-            json.dump(achievement_dict, f, indent=4)
-        print(f'Successfully wrote achievements to file: {file_path}')
-    except Exception as e:
-        print(f'Error writing achievements to file: {file_path}, Error: {e}')
-
-def scrape_all_achievements(app_id):
-    logger.debug(f"Scraping achievements for app ID: {app_id}")
-    soup = get_achievement_page(app_id)
-
-    script_tag = soup.find('script', text=lambda t: 'var sh =' in t if t else False)
-    if not script_tag:
-        logger.error("Error: Could not find the achievement data on the page.")
-        return {}
-
-    try:
-        script_content = script_tag.string
-        start_index = script_content.find('model:') + len('model:')
-        end_index = script_content.find('requestHttpMethod:')
-
-        if end_index == -1:
-            raw_json = script_content[start_index:].strip().rstrip(',').strip()
-        else:
-            raw_json = script_content[start_index:end_index].strip().rstrip(',').strip()
-
-        logger.debug(f"Extracted raw JSON length: {len(raw_json)}")
-
-        # Replace `new Date(...)` with a placeholder or remove it
-        raw_json = re.sub(r'new Date\([0-9]+\)', '"PLACEHOLDER_DATE"', raw_json)
-
-        if not raw_json or not raw_json.startswith('{') or not raw_json.endswith('}'):
-            logger.error("Extracted JSON appears incomplete or invalid.")
-            return {}
-
-        data = json.loads(raw_json)
-        achievements = data['listData']['pagedList']['items']
-        achievement_dict = {}
-
-        for achievement in achievements:
-            name, info = get_achievement_info(achievement)
-            if name:
-                # Use only steamPercentage and round it to 1 decimal place
-                steam_percentage = round(achievement.get("steamPercentage", 0), 1)
-                
-                # Round points to a whole number
-                points = round(achievement.get("points", 0))
-
-                # Extract and map tags
-                tags = achievement.get("tagVotes", [])
-                
-                # Use a set to avoid duplicate tags
-                unique_tags = {TAG_MAPPING[tag["tagId"]] for tag in tags if tag["tagId"] in TAG_MAPPING}
-                mapped_tags = list(unique_tags)
-
-                # Build the final info dictionary
-                info.update({
-                    "steamPercentage": steam_percentage,
-                    "points": points,
-                    "tags": mapped_tags
-                })
-
-                achievement_dict[name] = info
-
-        logger.debug(f"Parsed achievement data for app ID {app_id}: {achievement_dict}")
-        write_achievements_to_file(achievement_dict, app_id)
-        return achievement_dict
-
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON decoding error for app ID {app_id}: {e.doc[e.pos-50:e.pos+50]}")
-    except Exception as e:
-        logger.error(f"Error parsing achievements data for app ID {app_id}: {e}")
-
-    return {}
-
-def load_achievements_from_file(app_id):
-    file_path = os.path.join(os.path.dirname(__file__), 'data', f'achievements_{app_id}.json')
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            achievement_dict = json.load(f)
-        logger.debug(f'Loaded achievements for app {app_id} from JSON file')
-    except FileNotFoundError:
-        logger.debug(f'File not found, scraping achievements for app {app_id}')
-        achievement_dict = scrape_all_achievements(app_id)
-    return achievement_dict
-
-def find_rarest_achievement(app_id):
-    achievement_dict = load_achievements_from_file(app_id)
-    if not achievement_dict:
-        return None
-    
-    lowest_percentage = None
-    rarest_achievement_name = None
-    for name, info in achievement_dict.items():
-        percentage_value = info.get('steamPercentage', 'Unknown')
-        if isinstance(percentage_value, (int, float)):
-            percentage = float(percentage_value)
-        elif isinstance(percentage_value, str):
-            percentage = float(percentage_value.replace('%', ''))
-        else:
-            continue
-        
-        if lowest_percentage is None or percentage < lowest_percentage:
-            lowest_percentage = percentage
-            rarest_achievement_name = name
-    
-    if rarest_achievement_name:
-        return f"{rarest_achievement_name} ({lowest_percentage}%)"
-    else:
-        return None
-
-def get_achievement_description(app_id, achievement_name):
-    achievement_dict = load_achievements_from_file(app_id)
-    logger.debug(f"Looking for achievement: {achievement_name}")
-    # Normalize the achievement_name before searching
-    achievement_name = achievement_name.strip().lower()
-    # Normalize the keys in achievement_dict
-    achievement_dict = {k.strip().lower(): v for k, v in achievement_dict.items()}
-    achievement = achievement_dict.get(achievement_name)
-    if achievement is None:
-        logger.debug(f"Achievement not found: {achievement_name}")
-    else:
-        logger.debug(f"Loaded achievement: {achievement}")
-    return achievement
 
 async def get_user_games(user_id, api_key):
     client = SteamClient(api_key)
@@ -193,23 +24,49 @@ async def get_user_games(user_id, api_key):
 async def get_recently_played_games(user):
     current_time = datetime.now().strftime(DATE_FORMAT)
     recently_played_games = []
-    for user_game in user.owned_games:
+
+    # Prefer owned games list first (contains last_played timestamps when available)
+    for user_game in getattr(user, 'owned_games', []):
         if user_game.last_played != "Unknown":
-            last_played_date = datetime.strptime(user_game.last_played, DATE_FORMAT)
-            if datetime.strptime(current_time, DATE_FORMAT) - last_played_date <= timedelta(minutes=ACHIEVEMENT_TIME):
-                recently_played_games.append(user_game)
+            try:
+                last_played_date = datetime.strptime(user_game.last_played, DATE_FORMAT)
+                if datetime.strptime(current_time, DATE_FORMAT) - last_played_date <= timedelta(minutes=ACHIEVEMENT_TIME):
+                    recently_played_games.append(user_game)
+            except Exception:
+                # If parsing fails, skip and continue
+                continue
+
+    # Also include results from the recently-played endpoint (covers family-shared games)
+    try:
+        if hasattr(user, 'get_recently_played_games'):
+            user.get_recently_played_games()
+            for rp in getattr(user, 'recently_played_games', []):
+                # avoid duplicates by appid
+                if rp.appid not in [g.appid for g in recently_played_games]:
+                    recently_played_games.append(rp)
+    except Exception as e:
+        logger.debug(f"Could not fetch recently played games for {getattr(user, 'steam_id', 'unknown')}: {e}")
+
     return recently_played_games
 
 async def get_game_achievements(user_game, user, client):
     game_instance = client.game()
     try:
         game_instance.get_game_achievements(user_game.appid)
-    except KeyError as e:
+    except Exception as e:
         logger.error(f"Error processing achievements for game {user_game.appid}: {e}")
-        return None, None, 0
-    user.get_user_achievements(user_game.appid)
+        return None
+
+    # fetch the user's achievements for this game (synchronous API)
+    try:
+        user.get_user_achievements(user_game.appid)
+    except Exception as e:
+        logger.error(f"Error fetching user achievements for {user.summary and getattr(user.summary, 'personaname', user.steam_id)}: {e}")
+        return None
+
     if not game_instance.achievements:
-        return None, None, 0
+        return None
+
     total_achievements = len(game_instance.achievements)
     return game_instance.achievements, user.achievements, total_achievements
 
@@ -279,29 +136,33 @@ async def get_all_achievements(user_ids, api_keys):
     for user_id, api_key in zip(user_ids, api_keys):
         achievements = await check_recently_played_games(user_id, api_key)
         all_achievements.extend(achievements)
-    all_achievements.sort(key=lambda pair: datetime.strptime(pair[1].unlocktime, DATE_FORMAT))
+    try:
+        all_achievements.sort(key=lambda pair: datetime.strptime(pair[1].unlocktime, DATE_FORMAT))
+    except Exception as e:
+        logger.warning(f"Could not sort all_achievements: {e}")
+        # leave unsorted if entries are malformed
     return all_achievements
 
-def create_embed_info(user_achievement, user_game, total_achievements, current_count, user):
-    if achievement_info := get_achievement_description(user_game.appid, user_achievement.name):
-        title = f"{user_achievement.name}"
-        description = f"{achievement_info['description']}"
-        points = achievement_info.get("points", 0)  # Extract points
-        tags = achievement_info.get("tags", [])     # Extract tags
-    else:
-        title = f"{user_achievement.name}"
-        description = f"[{user_game.name}]({user_game.url})"
-        points = 0  # Default points if not available
-        tags = []
+def create_embed_info(game_achievement, user_achievement, user_game, current_count, total_achievements, user):
+    # Steamhunters scraping removed; fall back to basic/default values
+    ach_desc = getattr(game_achievement, 'description', '') or ''
+    # Title will be the achievement name (made clickable by embed url)
+    title = f"{user_achievement.name}"
+    # Description contains only the achievement description (game link removed)
+    description = ach_desc if ach_desc else ""
 
     logger.debug(f"Preparing to send embed for achievement: {user_achievement.name} in game: {user_game.name}")
 
-    completion_percentage = (current_count / total_achievements) * 100
-    unlock_percentage = f"{achievement_info['steamPercentage']}"
+    # Avoid division by zero
+    try:
+        completion_percentage = (current_count / total_achievements) * 100 if total_achievements else 0
+    except Exception:
+        completion_percentage = 0
+
     footer = f"{user.summary.personaname} • {user_achievement.unlocktime}"
     completion_info = f"{current_count}/{total_achievements} ({completion_percentage:.2f}%)"
-    
-    return title, description, completion_info, unlock_percentage, footer, points, tags
+
+    return title, description, completion_info, footer
 
 
 async def check_recently_played_games(user_id, api_key):
@@ -317,7 +178,10 @@ async def check_recently_played_games(user_id, api_key):
             game_achievement, user_achievement, total_achievements = result
             recent_achievements = await get_recent_achievements(game_achievement, user_achievement, user_game, user)
             for ach in recent_achievements:
-                achievements.append(ach + (total_achievements,))  # Create a new tuple that includes total achievements
+                # `ach` is (game_achievement, user_achievement, user_game, user, current_count)
+                # Return tuple as (game_achievement, user_achievement, user_game, user, total_achievements, current_count)
+                ga, ua, ug, u, current_count = ach
+                achievements.append((ga, ua, ug, u, total_achievements, current_count))
         return achievements
     except Exception as e:
         logger.error(f"Error processing achievements for user {user_id}: {e}")
@@ -326,23 +190,16 @@ async def check_recently_played_games(user_id, api_key):
 async def create_and_send_embed(channel, game_achievement, user_achievement, user_game, user, total_achievements, current_count):
     color = await get_discord_color(user_game.game_icon)
     
-    # Get information for the embed
-    title, description, completion_info, unlock_percentage, footer, points, tags = create_embed_info(user_achievement, user_game, current_count, total_achievements, user)
-    
-    # Create the embed
-    embed = EmbedBuilder(title=title, description=description, color=color)
+    # Get information for the embed (title is achievement name)
+    title, description, completion_info, footer = create_embed_info(game_achievement, user_achievement, user_game, current_count, total_achievements, user)
+
+    # Create the embed with the game URL so the title is clickable
+    embed = EmbedBuilder(title=title, description=description, color=discord.Color(color), url=user_game.url)
     embed.set_thumbnail(url=game_achievement.icon)
-    embed.set_author(name="Achievement unlocked", icon_url=user_game.game_icon)
+    # show the game as the author for clarity
+    embed.set_author(name=user_game.name, icon_url=user_game.game_icon)
     
-    embed.add_field(name="Game", value=f"[{user_game.name}]({user_game.url})", inline=False)
-    
-    # Add Tags field only if there are tags
-    if tags:  # Only add if tags are not empty
-        embed.add_field(name="Type", value=", ".join(tags), inline=False)
-    
-    # Add the existing fields
-    embed.add_field(name="Points", value=str(points), inline=True)
-    embed.add_field(name="Ratio", value=f"{unlock_percentage}%", inline=True)
+    # Add progress only — points/ratio no longer available via scraping
     embed.add_field(name="Progress", value=completion_info, inline=True)
     embed.set_footer(text=footer, icon_url=user.summary.avatarfull)
     
@@ -354,13 +211,19 @@ async def create_and_send_embed(channel, game_achievement, user_achievement, use
 async def create_and_send_completion_embed(completion_channel, user_game, user, total_achievements, latest_unlocktime):
     color = await get_discord_color(user_game.game_icon)
     description = f"[{user.summary.personaname}]({user.summary.profileurl}) has completed all {total_achievements} achievements for [{user_game.name}]({user_game.url})!"
-    embed = EmbedBuilder(description=description, color=color)
-    completion_time_span = calculate_completion_time_span(user.get_user_achievements(user_game.appid))
-    completion_time = str(completion_time_span).split('.')[0]  # Convert to string and remove microseconds
-    # Get the description of the rarest achievement
-    rarest_achievement = find_rarest_achievement(user_game.appid)
-    if rarest_achievement:
-        embed.add_field(name="Rarest Achievement", value=rarest_achievement, inline=False)
+    embed = EmbedBuilder(description=description, color=discord.Color(color))
+    # `get_user_achievements` returns the raw API response dict; guard if calculation fails
+    try:
+        completion_time_span = calculate_completion_time_span(user.get_user_achievements(user_game.appid))
+    except Exception as e:
+        logger.error(f"Error calculating completion time span: {e}")
+        completion_time_span = None
+
+    if completion_time_span is None:
+        completion_time = "unknown"
+    else:
+        completion_time = str(completion_time_span).split('.')[0]  # Convert to string and remove microseconds
+    # Rarest-achievement lookup removed (scraping no longer available)
     embed.set_author(name="Platinum unlocked", icon_url=PLATINUM_ICON)
     embed.set_thumbnail(url=user_game.game_icon)
     embed.set_footer(text=f"Platinum in {completion_time}", icon_url=user.summary.avatarfull)

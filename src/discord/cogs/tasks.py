@@ -19,7 +19,15 @@ class TasksCog(commands.Cog):
         api_keys = STEAM_API_KEY
         channel = self.bot.get_channel(ACHIEVEMENT_CHANNEL)
         all_achievements = await get_all_achievements(user_ids, api_keys)
-        all_achievements.sort(key=lambda a: (datetime.strptime(a[1].unlocktime, "%d/%m/%y %H:%M:%S"), a[4]/a[5]), reverse=False)
+        # Sort by unlock time, then by progress (current/total). Protect against division by zero.
+        def sort_key(a):
+            unlock = datetime.strptime(a[1].unlocktime, "%d/%m/%y %H:%M:%S")
+            total = a[4] if len(a) > 4 else 0
+            current = a[5] if len(a) > 5 else 0
+            progress = (current / total) if total else 0
+            return (unlock, progress)
+
+        all_achievements.sort(key=sort_key, reverse=False)
         logged_users = set()  # Set to keep track of users that have already been logged
         latest_unlocktimes = {}  # Dictionary to track the latest unlocktime for each user-game combination
 
